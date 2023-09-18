@@ -1,0 +1,42 @@
+{
+	"info": {
+		"_postman_id": "ffd754d0-b698-4f90-99f3-e68542bdcd25",
+		"name": "JohnSmith Login",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20999705"
+	},
+	"item": [
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"john.smith@fake.com\",\n    \"password\": \"crapiNoname!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://<customer>-crapi.nnsworkshop.com/identity/api/auth/login",
+					"protocol": "https",
+					"host": [
+						"<customer>-crapi",
+						"nnsworkshop",
+						"com"
+					],
+					"path": [
+						"identity",
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

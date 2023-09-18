@@ -1,0 +1,139 @@
+name: create-workshop-dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      CallbackHost:
+        description: 'Slack callback host'
+        type: string
+        required: true
+      AWSRegion:
+        description: 'AWS region to deploy workshop in'
+        type: string
+        required: true
+      CustomerName:
+        description: 'Name of the customer workshop is for - also FQDN'
+        type: string
+        required: true
+      SlackUserID:
+        description: 'List of user IDs that own this workshop'
+        type: string
+        required: true
+      SlackChannelID:
+        description: 'Where to send notifications about the workshop to'
+        type: string
+        required: true
+      NonameVersion:
+        description: 'The Noname version to install'
+        type: string
+        required: true
+      ParticipantEmails:
+        description: 'CSV list of participant email addresses to auto-register with Noname'
+        type: string
+        required: true
+      LabEndDate:
+        description: 'When the lab should end'
+        type: string
+        required: true
+      SlackUsername:
+        description: 'Username in slack of the person who launched the workshop'
+        type: string
+        required: true
+      PackageStage:
+        description: 'Staging folder to use when retrieving Noname package'
+        type: string
+        required: true
+        default: 'production'
+jobs:
+  create-the-workshop:
+    concurrency: ${{ github.event.inputs.CustomerName }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+          aws-region: ${{ github.event.inputs.AWSRegion }}
+      - name: Setup Variables
+        run: mv variables.tf.template variables.tf
+        working-directory: ./terraform/
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform/
+      - name: Terraform Workspace
+        id: createWorkspace
+        run: terraform workspace new $CUSTOMERNAME
+        working-directory: ./terraform/
+        env:
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+      - name: Create Workshop
+        run: terraform apply -var="package_stage=$PACKAGESTAGE" -var="slack_channelid=$SLACKCHANNELID" -var="callback_host=$CALLBACKHOST" -var="slack_userid=$SLACKUSERID" -var="git_branch=$BRANCH" -var="customer_name=$CUSTOMERNAME" -var="participant_emails=$PARTICIPANTS" -var="noname_version=$NONAMEVERSION" -var="aws_region=$AWSREGION" -auto-approve
+        working-directory: ./terraform/
+        env:
+          CALLBACKHOST: ${{ github.event.inputs.CallbackHost }}
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          SLACKUSERID: ${{ github.event.inputs.SlackUserID }}
+          SLACKCHANNELID: ${{ github.event.inputs.SlackChannelID }}
+          NONAMEVERSION: ${{ github.event.inputs.NonameVersion }}
+          AWSREGION: ${{ github.event.inputs.AWSRegion }}
+          PARTICIPANTS: ${{ github.event.inputs.ParticipantEmails }}
+          BRANCH: ${{ github.ref_name }}
+          PACKAGESTAGE: ${{ github.event.inputs.PackageStage }}
+      - name: Terraform Output
+        id: passwords
+        run: |
+          NONAME_SU_PASSWORD=$(terraform output -raw noname_su_password)
+          NONAME_PARTICIPANT_PASSWORD=$(terraform output -raw noname_admin_password)
+          echo "suPassword=$NONAME_SU_PASSWORD" >> $GITHUB_OUTPUT
+          echo "participantPassword=$NONAME_PARTICIPANT_PASSWORD" >> $GITHUB_OUTPUT
+        shell: bash
+        working-directory: ./terraform/
+      - name: Tag tfstate
+        if: ${{ always() }}
+        run: |
+          aws s3api put-object-tagging \
+          --bucket nn-workshop-tf-states \
+          --key env:/$CUSTOMERNAME/terraform.tfstate \
+          --tagging '{"TagSet": [{"Key": "githubBranch", "Value": "'$BRANCH'"}, {"Key": "participantPassword", "Value": "'$NONAME_PARTICIPANT_PASSWORD'"},{"Key": "suPassword", "Value": "'$NONAME_SU_PASSWORD'"},{ "Key": "nonameVersion", "Value": "'$NONAMEVERSION'" },{ "Key": "slackChannelID", "Value": "'$SLACKCHANNELID'" },{ "Key": "slackUsername", "Value": "'$SLACKUSERNAME'" },{ "Key": "slackUserID", "Value": "'$SLACKUSERID'" },{ "Key": "region", "Value": "'$AWSREGION'" }, { "Key": "labEndDate", "Value": "'$LABENDDATE'" }, { "Key": "creationDate", "Value": "'$(date +'%Y%m%d')'" }]}'
+        env:
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          AWSREGION: ${{ github.event.inputs.AWSRegion }}
+          LABENDDATE: ${{ github.event.inputs.LabEndDate }}
+          SLACKUSERID: ${{ github.event.inputs.SlackUserID }}
+          SLACKUSERNAME: ${{ github.event.inputs.SlackUsername }}
+          SLACKCHANNELID: ${{ github.event.inputs.SlackChannelID }}
+          NONAMEVERSION: ${{ github.event.inputs.NonameVersion }}
+          NONAME_SU_PASSWORD: ${{ steps.passwords.outputs.suPassword }}
+          NONAME_PARTICIPANT_PASSWORD: ${{ steps.passwords.outputs.participantPassword }}
+          BRANCH: ${{ github.ref_name }}
+      - name: Cleanup Failed Job
+        if: ${{ failure() }}
+        run: terraform destroy -var="aws_region=$AWSREGION" -var="customer_name=$CUSTOMERNAME" -auto-approve && terraform workspace select default && terraform workspace delete $CUSTOMERNAME
+        working-directory: ./terraform/
+        env:
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          AWSREGION: ${{ github.event.inputs.AWSRegion }}
+      - name: Notify On Success
+        if: ${{ success() }}
+        run: |
+          curl https://$CALLBACKHOST/notify -d '{ "notification": "🚀 Your workshop launched successfully! 🚀", "message": "Your workshop for *'$CUSTOMERNAME'* has successfully been launched. I will notify you again when the Noname installation has completed!", "channel": "'$SLACKCHANNELID'", "user": "'$SLACKUSERID'", "type": "simple_notification"}' -H 'Content-Type: application/json'
+        env:
+          CALLBACKHOST: ${{ github.event.inputs.CallbackHost }}
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          SLACKUSERID: ${{ github.event.inputs.SlackUserID }}
+          SLACKCHANNELID: ${{ github.event.inputs.SlackChannelID }}
+      - name: Notify On Failure
+        if: ${{ failure() }}
+        run: |
+          curl https://$CALLBACKHOST/notify -d '{ "notification": "‼️ Your workshop failed to launch! ‼️", "message": "Your workshop for *'$CUSTOMERNAME'* has failed to launch. Please see run for more information: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "button": {"text":"Try Again","value":"${{ github.run_id }}","action":"rerun_workflow_job","style":"primary"}, "channel": "'$SLACKCHANNELID'", "user": "'$SLACKUSERID'", "type": "simple_notification"}' -H 'Content-Type: application/json'
+        env:
+          CALLBACKHOST: ${{ github.event.inputs.CallbackHost }}
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          SLACKUSERID: ${{ github.event.inputs.SlackUserID }}
+          SLACKCHANNELID: ${{ github.event.inputs.SlackChannelID}}

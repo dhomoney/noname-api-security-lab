@@ -1,0 +1,82 @@
+name: Destroy Workshop
+description: This action destroys a Noname Workshop
+inputs:
+  customer-name:
+    required: true
+    description: The customer's name
+  aws-access-key-id:
+    required: true
+    description: AWS Access Key ID
+  aws-secret-access-key:
+    required: true
+    description: AWS Secret Access Key
+  callbackUrl:
+    required: false
+    description: Optional calllback URL for sending Slack notification
+  slack-user-id:
+    required: true
+    description: User ID/IDs of host and co-hosts
+  slack-channel-id:
+    required: true
+    description: The channel ID to send notifications to
+  aws-region:
+    required: true
+    description: Region that we are destroying the workshop from
+runs:
+  using: "composite"
+  steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+    - name: Setup Variables
+      shell: bash
+      run: mv variables.tf.template variables.tf
+      working-directory: ./terraform/
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v2
+    - name: Terraform Init
+      shell: bash
+      run: terraform init
+      working-directory: ./terraform/
+    - name: Terraform Workspace
+      shell: bash
+      run: terraform workspace select $CUSTOMERNAME
+      working-directory: ./terraform/
+      env:
+        CUSTOMERNAME: ${{ inputs.customer-name }}
+    - name: Destroy Workshop
+      shell: bash
+      run: terraform destroy -var="customer_name=$CUSTOMERNAME" -var="aws_region=$AWSREGION" -auto-approve
+      working-directory: ./terraform/
+      env:
+        CUSTOMERNAME: ${{ inputs.customer-name }}
+        AWSREGION: ${{ inputs.aws-region }}
+    - name: Terraform Workspace Delete
+      shell: bash
+      run: terraform workspace select default && terraform workspace delete $CUSTOMERNAME
+      working-directory: ./terraform/
+      env:
+        CUSTOMERNAME: ${{ inputs.customer-name }}
+    - name: Notify On Success
+      if: ${{ success() && inputs.callbackUrl != '' }}
+      shell: bash
+      run: |
+        curl $CALLBACKURL -d '{ "notification": "🧨 Your workshop was destroyed successfully! 🧨", "message": "<!here> Your workshop for *'$CUSTOMERNAME'* has successfully been destroyed.", "channel": "'$SLACKCHANNELID'", "user": "'$SLACKUSERID'", "type": "simple_notification"}' -H 'Content-Type: application/json'
+      env:
+        CALLBACKURL: ${{ inputs.callbackUrl }}
+        CUSTOMERNAME: ${{ inputs.customer-name }}
+        SLACKUSERID: ${{ inputs.slack-user-id }}
+        SLACKCHANNELID: ${{ inputs.slack-channel-id }}
+    - name: Notify On Failure
+      if: ${{ failure() && inputs.callbackUrl != '' }}
+      shell: bash
+      run: |
+        curl $CALLBACKURL -d '{ "notification": "‼️ Your workshop failed to destroy! ‼️", "message": "Your workshop for *'$CUSTOMERNAME'* has failed to destroy. Please see run for more information: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "channel": "'$SLACKCHANNELID'", "user": "'$SLACKUSERID'", "type": "simple_notification"}' -H 'Content-Type: application/json'
+      env:
+        CALLBACKURL: ${{ inputs.callbackUrl }}
+        CUSTOMERNAME: ${{ inputs.customer-name }}
+        SLACKUSERID: ${{ inputs.slack-user-id }}
+        SLACKCHANNELID: ${{ inputs.slack-channel-id }}

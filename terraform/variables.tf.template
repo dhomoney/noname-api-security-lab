@@ -1,0 +1,79 @@
+# Prefix to use when naming all created resources
+variable "customer_name" {
+  type    = string
+}
+
+variable "participant_emails" {
+  type    = string
+  default = ""
+}
+
+variable "callback_host" {
+  type    = string
+  default = ""
+}
+
+variable "slack_userid" {
+  type    = string
+  default = ""
+}
+
+variable "slack_channelid" {
+  type    = string
+  default = ""
+}
+
+variable "git_branch" {
+  type    = string
+  default = "main"
+}
+
+variable "package_stage" {
+  type    = string
+  default = "production"
+}
+
+variable "noname_version" {
+  type    = string
+  default = ""
+}
+
+# Which size instance to use for noname server
+variable "nnServer_machine_type" {
+  type    = string
+  default = "t3a.xlarge"
+}
+
+# Which size instance to use for crapi server
+variable "app_machine_type" {
+  type    = string
+  default = "t3.small"
+}
+
+# Deployment region
+variable "aws_region" {
+  type    = string
+}
+
+# CIDR for new Noname vpc
+variable "noname_cidr" {
+  type    = string
+  default = "10.0.0.0/24"
+}
+
+# CIDR for new app vpc
+variable "app_cidr" {
+  type    = string
+  default = "10.1.0.0/23"
+}
+
+# For ALB, two subnets are required:
+variable "app_subnet1_cidr" {
+  type    = string
+  default = "10.1.0.0/24"
+}
+
+variable "app_subnet2_cidr" {
+  type    = string
+  default = "10.1.1.0/24"
+}

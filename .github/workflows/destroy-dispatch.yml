@@ -1,0 +1,80 @@
+name: destroy-workshop-dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      CallbackHost:
+        description: 'Callback host for slack notification'
+        required: true
+        type: string
+      CustomerName:
+        description: 'Name of the customer environment we are destroying'
+        required: true
+        type: string
+      region:
+        description: 'Region the envrionment is in'
+        required: true
+        type: string
+      labEndDate:
+        description: 'Lab end date'
+        required: true
+        type: string
+      slackUserID:
+        description: 'Slack user IDs'
+        required: true
+        type: string
+      slackUsername:
+        description: 'Username of the person who created the workshop'
+        required: true
+        type: string
+      slackChannelID:
+        description: 'ID of the channel to send notifications to'
+        required: true
+        type: string
+      destroying:
+        description: 'Are we destroying the workshop?'
+        required: true
+        type: string
+        default: 'true'
+      creationDate:
+        description: 'When was the lab created'
+        required: false
+        type: string
+      nonameVersion:
+        description: 'Version of Noname that lab was created with'
+        required: false
+        type: string
+      
+jobs:
+  destroy-the-workshop:
+    concurrency: ${{ github.event.inputs.CustomerName }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Tag tfstate that we're destroying
+        run: |
+          aws s3api put-object-tagging \
+          --bucket nn-workshop-tf-states \
+          --key env:/$CUSTOMERNAME/terraform.tfstate \
+          --tagging '{"TagSet": [{ "Key": "nonameVersion", "Value": "'$NONAMEVERSION'" },{ "Key": "slackChannelID", "Value": "'$SLACKCHANNELID'" },{"Key": "destroying", "Value": "true"},{ "Key": "slackUsername", "Value": "'$SLACKUSERNAME'" },{ "Key": "slackUserID", "Value": "'$SLACKUSERID'" },{ "Key": "region", "Value": "'$AWSREGION'" }, { "Key": "labEndDate", "Value": "'$LABENDDATE'" }, { "Key": "creationDate", "Value": "'$(date +'%Y%m%d')'" }]}'
+        env:
+          CUSTOMERNAME: ${{ github.event.inputs.CustomerName }}
+          AWSREGION: ${{ github.event.inputs.region }}
+          LABENDDATE: ${{ github.event.inputs.labEndDate }}
+          SLACKUSERID: ${{ github.event.inputs.slackUserID }}
+          SLACKCHANNELID: ${{ github.event.inputs.slackChannelID }}
+          NONAMEVERSION: ${{ github.event.inputs.nonameVersion }}
+          SLACKUSERNAME: ${{ github.event.inputs.slackUsername }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_SECRET }}
+          AWS_REGION: 'us-east-2'
+      - name: Destroy Workshop
+        uses: ./.github/actions/destroy
+        with:
+          customer-name: ${{ github.event.inputs.CustomerName }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+          callbackUrl: https://${{ github.event.inputs.CallbackHost }}/notify
+          slack-user-id: ${{ github.event.inputs.slackUserID }}
+          slack-channel-id: ${{ github.event.inputs.slackChannelID }}
+          aws-region: ${{ github.event.inputs.region }}

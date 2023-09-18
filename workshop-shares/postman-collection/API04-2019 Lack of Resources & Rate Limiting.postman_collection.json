@@ -1,0 +1,160 @@
+{
+	"info": {
+		"_postman_id": "8c88f1e6-a1b8-4a78-a0c5-c759823fbda4",
+		"name": "API04:2019 Lack of Resources & Rate Limiting",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20999705"
+	},
+	"item": [
+		{
+			"name": "Excessive Requests For Non-Existing Resources",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.variables.set(\"retryCount3\",50)"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.variables.get(\"retryCounter3\") === undefined ? pm.variables.set('retryCounter3', pm.variables.get(\"retryCount3\")) : null",
+							"retryCount = pm.variables.get(\"retryCounter3\");",
+							"",
+							"if (retryCount > 1) {",
+							"    pm.variables.set('retryCounter3', --retryCount)",
+							"    postman.setNextRequest(pm.info.requestName);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"content\": \"My car is broken\",\n    \"title\": \"hello world\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/identity/api/v2/vehicle/{{$randomUUID}}/location",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"identity",
+						"api",
+						"v2",
+						"vehicle",
+						"{{$randomUUID}}",
+						"location"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Brute Force",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var currentCount = parseInt(pm.globals.get(\"brute_force_count\"));",
+							"var currentOtp = parseInt(pm.globals.get(\"brute_force_otp\"));",
+							"if (currentCount > 0){",
+							" currentCount = currentCount - 1;",
+							" currentOtp = currentOtp + 1;",
+							" pm.globals.set(\"brute_force_count\", currentCount);",
+							" pm.globals.set(\"brute_force_otp\", currentOtp);",
+							" postman.setNextRequest(pm.info.requestName);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"email\": \"{{$randomEmail}}\", \"password\": \"{{$randomPassword}}\"}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/identity/api/auth/login",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"identity",
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

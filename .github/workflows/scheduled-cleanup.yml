@@ -1,0 +1,115 @@
+name: scheduled-cleanup
+on:
+  schedule:
+    - cron: 0 5 * * *
+  workflow_dispatch:
+
+jobs:
+  determine-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch
+        id: branch_check
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+    outputs:
+      environment: ${{ steps.branch_check.outputs.environment }}
+  get-expired-workshops:
+    runs-on: ubuntu-latest
+    outputs:
+      expired-workshops: ${{ steps.expiredWorkshops.outputs.expired-workshops }}
+      expired-count: ${{ steps.expiredWorkshops.outputs.expired-count }}
+      expiring-workshops: ${{ steps.expiredWorkshops.outputs.expiring-workshops }}
+      expiring-count: ${{ steps.expiredWorkshops.outputs.expiring-count }}
+      expiresoon-count: ${{ steps.expiredWorkshops.outputs.expiresoon-count }}
+      expiresoon-workshops: ${{ steps.expiredWorkshops.outputs.expiresoon-workshops }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: expiredWorkshops
+        run: chmod +x ./.github/workflows/.scripts/get-expired-workshops.sh && ./.github/workflows/.scripts/get-expired-workshops.sh
+        env:
+          WORKSHOPS: ${{ steps.workshops.outputs.workshops }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_SECRET }}
+          AWS_REGION: 'us-east-2'
+  notify-expiresoon-workshps:
+    needs: [ get-expired-workshops, determine-environment ]
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    if: ${{ needs.get-expired-workshops.outputs.expiresoon-count > 0 }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        customer: ${{ fromJson(needs.get-expired-workshops.outputs.expiresoon-workshops) }}
+    steps:
+      - name: Notify workshop expiring soon
+        run: |
+          CUSTOMERNAME=$(echo $customerData | awk '{print $1}')
+          SLACKUSERID=$(echo $customerData | awk '{print $2}')
+          SLACKCHANNELID=$(echo $customerData | awk '{print $3}')
+          EXPIRATIONDATE=$(echo $customerData | awk '{print $5}')
+          EXPIRATIONDATEHUMAN=$(date -d "$EXPIRATIONDATE" +'%B %d, %Y')
+          curl https://slack-api.nnsworkshop.com/notify -d '{ "notification": "⚠️ You have a workshop expiring soon!", "message": "<!here> Friendly reminder that your workshop https://'$CUSTOMERNAME'.nnsworkshop.com will be destroyed within the next several days! The lab end date is currently set to `'"$EXPIRATIONDATEHUMAN"'`. Please extend the workshop if you still need it.", "user": "'$SLACKUSERID'", "channel": "'$SLACKCHANNELID'", "type": "simple_notification", "button": { "text": "⏳ Change End Date", "value": "{\"w\":\"'$CUSTOMERNAME'\",\"e\":\"'$EXPIRATIONDATE'\",\"s\":\"'$SLACKCHANNELID'\"}", "action": "extend_workshop", "style": "primary" }}' -H 'Content-Type: application/json'
+        env:
+          customerData: ${{ matrix.customer }}
+  notify-expiring-workshops:
+    needs: [ get-expired-workshops, determine-environment ]
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    if: ${{ needs.get-expired-workshops.outputs.expiring-count > 0 }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        customer: ${{ fromJson(needs.get-expired-workshops.outputs.expiring-workshops) }}
+    steps:
+      - name: Notify workshop expiring tomorrow
+        run: |
+          CUSTOMERNAME=$(echo $customerData | awk '{print $1}')
+          SLACKUSERID=$(echo $customerData | awk '{print $2}')
+          SLACKCHANNELID=$(echo $customerData | awk '{print $3}')
+          curl https://slack-api.nnsworkshop.com/notify -d '{ "notification": "⚠️ You have a workshop expiring tomorrow!", "message": "<!here> Friendly reminder that your workshop for *'$CUSTOMERNAME'* will be destroyed tomorrow around ~1AM during scheduled cleanup! Please extend the workshop if you still need it.", "user": "'$SLACKUSERID'", "channel": "'$SLACKCHANNELID'", "type": "simple_notification"}' -H 'Content-Type: application/json'
+        env:
+          customerData: ${{ matrix.customer }}
+  destroy-expired-workshops:
+    needs: [ get-expired-workshops, determine-environment ]
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    if: ${{ needs.get-expired-workshops.outputs.expired-count > 0 }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        customer: ${{ fromJson(needs.get-expired-workshops.outputs.expired-workshops) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Split apart input
+        id: customerFields
+        run: |
+          CUSTOMERNAME=$(echo $customer | awk '{print $1}')
+          SLACKUSERID=$(echo $customer | awk '{print $2}')
+          SLACKCHANNELID=$(echo $customer | awk '{print $3}')
+          AWSREGION=$(echo $customer | awk '{print $4}')
+
+          echo $CUSTOMERNAME
+          echo $SLACKUSERID
+          echo $SLACKCHANNELID
+          echo $AWSREGION
+
+          echo "CUSTOMERNAME=$CUSTOMERNAME" >> $GITHUB_OUTPUT
+          echo "SLACKUSERID=$SLACKUSERID" >> $GITHUB_OUTPUT
+          echo "SLACKCHANNELID=$SLACKCHANNELID" >> $GITHUB_OUTPUT
+          echo "AWSREGION=$AWSREGION" >> $GITHUB_OUTPUT
+        env:
+          customer: ${{ matrix.customer }}
+      - name: Destroy Workshop
+        uses: ./.github/actions/destroy
+        with:
+          customer-name: ${{ steps.customerFields.outputs.CUSTOMERNAME }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+          callbackUrl: ${{ secrets.CALLBACK_URL }}
+          slack-user-id: ${{ steps.customerFields.outputs.SLACKUSERID }}
+          slack-channel-id: ${{ steps.customerFields.outputs.SLACKCHANNELID }}
+          aws-region: ${{ steps.customerFields.outputs.AWSREGION }}

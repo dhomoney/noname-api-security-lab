@@ -1,0 +1,33 @@
+location =/postman-collection {
+  add_header Content-Type application/zip;
+  add_header Content-Disposition "attachment; filename=postman-collection.zip";
+  alias /etc/nginx/templates/postman-collection.zip;
+}
+
+location =/janeDoe.postman_collection.json {
+  add_header Content-Type application/json;
+  add_header Content-Disposition "attachment; filename=janeDoe.postman_collection.json";
+  alias /etc/nginx/templates/janeDoe.postman_collection.json;
+}
+
+location =/johnSmith.postman_collection.json {
+  add_header Content-Type application/json;
+  add_header Content-Disposition "attachment; filename=johnSmith.postman_collection.json";
+  alias /etc/nginx/templates/johnSmith.postman_collection.json;
+}
+
+location =/crapi-spec.json {
+  add_header Content-Type application/json;
+  add_header Content-Disposition "attachment; filename=crapi-spec.json";
+  alias /etc/nginx/templates/crapi-at-spec.json;
+}
+
+location /pre-work {
+    index index.html;
+    alias /etc/nginx/templates/prework/;
+}
+
+location /guide {
+    index index.html;
+    alias /etc/nginx/templates/guide/;
+}

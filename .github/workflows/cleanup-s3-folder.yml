@@ -1,0 +1,15 @@
+name: cleanup-s3-files
+on: delete
+jobs:
+  cleanup-s3-shares:
+    if: github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET }}
+          aws-region: 'us-east-2'
+      - name: Delete branch s3 folder
+        run: aws s3 rm s3://noname-workshop-share/${{ github.event.ref }} --recursive

